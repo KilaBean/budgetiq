@@ -24,6 +24,7 @@ import '../../../insights/presentation/widgets/insight_tile.dart';
 import '../../../transactions/presentation/providers/transaction_providers.dart';
 import '../../../transactions/presentation/widgets/transaction_form_sheet.dart';
 import '../../domain/services/dashboard_summary.dart';
+import '../../domain/services/safe_to_spend.dart';
 import '../../domain/services/monthly_trend.dart';
 import '../../../../shared/widgets/staggered_entrance.dart';
 import '../providers/dashboard_providers.dart';
@@ -86,15 +87,18 @@ class DashboardPage extends ConsumerWidget {
         onRefresh: () async => ref.invalidate(dashboardSourcesProvider),
         child: CustomScrollView(
           slivers: [
-            // The greeting doubles as the collapsing title, so the header
-            // earns its space instead of repeating the tab name.
-            SliverAppBar.large(
+            // Greeting left, account right — the balanced header nearly every
+            // finance app uses, and the avatar doubles as the account entry
+            // point so the profile is always one tap from home.
+            SliverAppBar(
+              pinned: true,
+              titleSpacing: 16,
+              toolbarHeight: 72,
               title: _Greeting(email: email),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.person_outline),
-                  tooltip: 'Profile',
-                  onPressed: () => context.push(AppRoutes.profile),
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: _ProfileAvatarButton(email: email),
                 ),
               ],
             ),
@@ -127,9 +131,7 @@ class DashboardPage extends ConsumerWidget {
   /// The dashboard cards, in reading order: what can I spend, what happened,
   /// where it went, how am I doing.
   List<Widget> _sections(DashboardSummary summary) => [
-    const _SafeToSpendCard(),
-    const SizedBox(height: 12),
-    _NetCard(summary: summary),
+    _HeadlineCard(summary: summary),
     const SizedBox(height: 12),
     IntrinsicHeight(
       child: Row(
@@ -230,19 +232,142 @@ class _MonthSwitcher extends ConsumerWidget {
   }
 }
 
-/// The headline card: what is left to spend, and what that is per day.
-class _SafeToSpendCard extends ConsumerWidget {
-  const _SafeToSpendCard();
+/// The one card that answers "how am I doing this month".
+///
+/// Deliberately the only large card on the screen: research on finance
+/// dashboards is consistent that the home screen should carry a single
+/// headline takeaway and push the rest a tap away. It stacks, in order of how
+/// often the question is asked:
+///
+/// 1. what can I still spend (and per day),
+/// 2. how far through that allowance I am,
+/// 3. what actually happened this month (net + savings rate + trend).
+class _HeadlineCard extends ConsumerStatefulWidget {
+  const _HeadlineCard({required this.summary});
+
+  final DashboardSummary summary;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HeadlineCard> createState() => _HeadlineCardState();
+}
+
+class _HeadlineCardState extends ConsumerState<_HeadlineCard> {
+  /// The month being scrubbed on the sparkline, if any.
+  MonthlyTotals? _scrubbed;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = widget.summary;
     final theme = Theme.of(context);
     final financial = theme.extension<FinancialColors>()!;
     final safe = ref.watch(safeToSpendProvider).value;
-    if (safe == null) return const SizedBox.shrink();
+    final trend = ref.watch(dashboardTrendProvider).value;
 
+    final scrubbed = _scrubbed;
+    final net = scrubbed?.net ?? summary.net;
+    final overspent = safe?.isOverspent ?? false;
+
+    return Card(
+      color: theme.colorScheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (safe != null) ...[
+              _SafeToSpend(safe: safe),
+              const SizedBox(height: 14),
+              _SpendProgress(summary: summary, safe: safe),
+              const SizedBox(height: 14),
+              Divider(
+                height: 1,
+                color: theme.colorScheme.onPrimaryContainer.withValues(
+                  alpha: 0.12,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        scrubbed == null
+                            ? 'Net this month'
+                            : 'Net in ${scrubbed.month.label}',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer
+                              .withValues(alpha: 0.8),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          AnimatedAmount(
+                            amount: net,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: net.minorUnits >= 0
+                                  ? financial.income
+                                  : financial.expense,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (scrubbed == null && !summary.income.isZero)
+                            Text(
+                              '${(summary.savingsRate * 100).round()}% saved',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onPrimaryContainer
+                                    .withValues(alpha: 0.8),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (trend != null && trend.length > 1)
+                  Semantics(
+                    label:
+                        'Net trend over the last ${trend.length} months, '
+                        'ending at ${trend.last.net.format()}',
+                    image: true,
+                    excludeSemantics: true,
+                    child: SizedBox(
+                      width: 96,
+                      height: 44,
+                      child: _NetSparkline(
+                        series: trend,
+                        onScrub: (month) => setState(() => _scrubbed = month),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            if (safe == null && overspent) const SizedBox.shrink(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The headline number: what is left, and what that is per remaining day.
+class _SafeToSpend extends StatelessWidget {
+  const _SafeToSpend({required this.safe});
+
+  final SafeToSpend safe;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final financial = theme.extension<FinancialColors>()!;
+    final onContainer = theme.colorScheme.onPrimaryContainer;
     final overspent = safe.isOverspent;
-    final amountColor = overspent ? financial.expense : financial.income;
     final basis = safe.fromBudget ? 'your budget' : 'what you earned';
 
     return Semantics(
@@ -250,51 +375,123 @@ class _SafeToSpendCard extends ConsumerWidget {
       label: overspent
           ? 'Over budget this month'
           : 'Safe to spend ${safe.remaining.format()}, '
-                '${safe.perDay.format()} per day for ${safe.daysLeft} days',
+                '${safe.perDay.format()} a day for ${safe.daysLeft} days',
       excludeSemantics: true,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Text(
-                    overspent ? 'Over budget' : 'Safe to spend',
-                    style: theme.textTheme.labelLarge,
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    safe.fromBudget
-                        ? Icons.account_balance_wallet_outlined
-                        : Icons.savings_outlined,
-                    size: 14,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              AnimatedAmount(
-                amount: safe.remaining,
-                style: theme.textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: amountColor,
-                ),
-              ),
-              const SizedBox(height: 4),
               Text(
-                overspent
-                    ? 'You have spent more than $basis this month.'
-                    : '${safe.perDay.format()} a day for the next '
-                          '${safe.daysLeft} ${safe.daysLeft == 1 ? "day" : "days"}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                overspent ? 'Over budget' : 'Safe to spend',
+                style: theme.textTheme.labelLarge?.copyWith(color: onContainer),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                safe.fromBudget
+                    ? Icons.account_balance_wallet_outlined
+                    : Icons.savings_outlined,
+                size: 14,
+                color: onContainer.withValues(alpha: 0.7),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedAmount(
+              amount: safe.remaining,
+              style: theme.textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: overspent ? financial.expense : financial.income,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            overspent
+                ? 'You have spent more than $basis this month.'
+                : '${safe.perDay.format()} a day for the next '
+                      '${safe.daysLeft} ${safe.daysLeft == 1 ? "day" : "days"}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: onContainer.withValues(alpha: 0.85),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// How far through the month against how far through the allowance.
+///
+/// The marker is the honest part: being 60% through your budget only matters
+/// relative to how much of the month is gone, so the bar shows both.
+class _SpendProgress extends StatelessWidget {
+  const _SpendProgress({required this.summary, required this.safe});
+
+  final DashboardSummary summary;
+  final SafeToSpend safe;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onContainer = theme.colorScheme.onPrimaryContainer;
+
+    // Spent against the same basis the headline uses.
+    final spent = summary.expense.minorUnits.toDouble();
+    final total = safe.fromBudget
+        ? spent + safe.remaining.minorUnits
+        : summary.income.minorUnits.toDouble();
+    final ratio = total <= 0 ? 0.0 : (spent / total).clamp(0.0, 1.0);
+
+    final now = DateTime.now();
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final monthElapsed = (daysInMonth - safe.daysLeft + 1) / daysInMonth;
+    final aheadOfPace = ratio > monthElapsed;
+
+    return Semantics(
+      label:
+          '${(ratio * 100).round()} percent of '
+          '${safe.fromBudget ? "budget" : "income"} spent, '
+          '${(monthElapsed * 100).round()} percent through the month',
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Stack(
+              children: [
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: ratio),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, _) => LinearProgressIndicator(
+                    value: value,
+                    minHeight: 8,
+                    backgroundColor: onContainer.withValues(alpha: 0.15),
+                    color: safe.isOverspent
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            safe.isOverspent
+                ? 'Spending is over the line for this month'
+                : aheadOfPace
+                ? 'Spending faster than the month is passing'
+                : 'On pace for the month',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: onContainer.withValues(alpha: 0.8),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -361,98 +558,78 @@ class _Greeting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final name = email?.split('@').first;
-    // The app bar shrinks its title as the header collapses, so this is one
-    // line rather than a stack; the month lives in the switcher below.
+
     return Semantics(
       header: true,
-      child: Text(name == null ? 'Welcome back' : 'Hi, $name'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _salutation(DateTime.now().hour),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            name ?? 'Welcome back',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  /// Time-of-day greeting — a small touch, but it makes the app feel like it
+  /// knows when you opened it.
+  static String _salutation(int hour) {
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
   }
 }
 
-class _NetCard extends ConsumerStatefulWidget {
-  const _NetCard({required this.summary});
+/// Circular account button carrying the user's initial.
+///
+/// An avatar reads as "you / your account" far more immediately than a generic
+/// person glyph, and gives the header a visual anchor opposite the greeting.
+class _ProfileAvatarButton extends StatelessWidget {
+  const _ProfileAvatarButton({required this.email});
 
-  final DashboardSummary summary;
-
-  @override
-  ConsumerState<_NetCard> createState() => _NetCardState();
-}
-
-class _NetCardState extends ConsumerState<_NetCard> {
-  /// The month being scrubbed on the sparkline, if any.
-  MonthlyTotals? _scrubbed;
+  final String? email;
 
   @override
   Widget build(BuildContext context) {
-    final summary = widget.summary;
     final theme = Theme.of(context);
-    final financial = theme.extension<FinancialColors>()!;
-    final scrubbed = _scrubbed;
-    final net = scrubbed?.net ?? summary.net;
-    final positive = net.minorUnits >= 0;
-    final trend = ref.watch(dashboardTrendProvider).value;
-    return Card(
-      color: theme.colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        scrubbed == null
-                            ? 'Net this month'
-                            : 'Net in ${scrubbed.month.label}',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      AnimatedAmount(
-                        amount: net,
-                        style: theme.textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: positive
-                              ? financial.income
-                              : financial.expense,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (trend != null && trend.length > 1)
-                  Semantics(
-                    label:
-                        'Net trend over the last ${trend.length} months, '
-                        'ending at ${trend.last.net.format()}',
-                    image: true,
-                    excludeSemantics: true,
-                    child: SizedBox(
-                      width: 104,
-                      height: 48,
-                      child: _NetSparkline(
-                        series: trend,
-                        onScrub: (month) => setState(() => _scrubbed = month),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Savings rate: ${(summary.savingsRate * 100).round()}%',
-              style: theme.textTheme.bodyMedium?.copyWith(
+    final initial = (email?.trim().isNotEmpty ?? false)
+        ? email!.trim().characters.first.toUpperCase()
+        : '?';
+
+    return Tooltip(
+      message: 'Profile and settings',
+      child: InkWell(
+        onTap: () => context.push(AppRoutes.profile),
+        customBorder: const CircleBorder(),
+        child: Semantics(
+          button: true,
+          label: 'Profile and settings',
+          child: CircleAvatar(
+            radius: 20,
+            backgroundColor: theme.colorScheme.primaryContainer,
+            child: Text(
+              initial,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
                 color: theme.colorScheme.onPrimaryContainer,
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

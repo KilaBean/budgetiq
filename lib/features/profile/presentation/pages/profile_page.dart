@@ -77,6 +77,17 @@ class ProfilePage extends ConsumerWidget {
                 onTap: () => _pickCurrency(context, ref),
               ),
               _BiometricTile(),
+              // Finance apps have to earn trust explicitly: say plainly what
+              // happens to the data rather than leaving the user to assume.
+              const ListTile(
+                leading: Icon(Icons.lock_outline),
+                title: Text('Your data is encrypted on this device'),
+                subtitle: Text(
+                  'Offline data is stored with a key held in the device '
+                  'keystore, and only you can read your account on the server.',
+                ),
+                dense: true,
+              ),
             ],
           ),
           _SettingsSection(

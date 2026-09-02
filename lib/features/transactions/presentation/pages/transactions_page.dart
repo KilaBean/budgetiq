@@ -6,6 +6,7 @@ import '../../../../core/error/failure.dart';
 import '../../../../core/haptics.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/domain/month.dart';
+import '../../../../shared/domain/money.dart';
 import '../../../../shared/domain/transaction_kind.dart';
 import '../../../../shared/widgets/category_avatar.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -35,8 +36,7 @@ class TransactionsPage extends ConsumerStatefulWidget {
 }
 
 class _TransactionsPageState extends ConsumerState<TransactionsPage> {
-  late TransactionKind kind =
-      widget.initialKind ?? TransactionKind.expense;
+  late TransactionKind kind = widget.initialKind ?? TransactionKind.expense;
 
   void _setKind(TransactionKind next) {
     if (next == kind) return;
@@ -115,6 +115,20 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     } catch (e) {
       if (context.mounted) _showError(context, e);
     }
+  }
+
+  /// Splits an already date-sorted list into day buckets, newest first.
+  List<_TransactionDay> _groupByDay(List<Transaction> transactions) {
+    final days = <_TransactionDay>[];
+    for (final transaction in transactions) {
+      final date = DateUtils.dateOnly(transaction.occurredOn);
+      if (days.isNotEmpty && days.last.date == date) {
+        days.last.transactions.add(transaction);
+      } else {
+        days.add(_TransactionDay(date: date, transactions: [transaction]));
+      }
+    }
+    return days;
   }
 
   Future<void> _loadOlder(BuildContext context, WidgetRef ref) async {
@@ -273,43 +287,62 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                         : () => _openForm(context, ref),
                   );
                 }
+                final days = _groupByDay(transactions);
+
                 return RefreshIndicator(
                   onRefresh: () async =>
                       ref.invalidate(transactionListProvider(kind)),
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                     children: [
-                      Card(
-                        margin: EdgeInsets.zero,
-                        child: Column(
-                          children: [
-                            for (var i = 0; i < transactions.length; i++) ...[
-                              if (i > 0)
-                                Divider(
-                                  height: 1,
-                                  thickness: 1,
-                                  indent: 72,
-                                  endIndent: 0,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .outlineVariant
-                                      .withValues(alpha: 0.4),
-                                ),
-                              _TransactionTile(
-                                transaction: transactions[i],
-                                accent: _accent(context),
-                                onTap: () => _openForm(
-                                  context,
-                                  ref,
-                                  existing: transactions[i],
-                                ),
-                                onDelete: () =>
-                                    _delete(context, ref, transactions[i]),
-                              ),
-                            ],
-                          ],
+                      // Grouped by day with a running total per day: a flat
+                      // list of dated rows makes the reader do the grouping in
+                      // their head, which is exactly the work the app is for.
+                      for (final day in days) ...[
+                        _DayHeader(
+                          date: day.date,
+                          total: day.total,
+                          accent: _accent(context),
                         ),
-                      ),
+                        Card(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          child: Column(
+                            children: [
+                              for (
+                                var i = 0;
+                                i < day.transactions.length;
+                                i++
+                              ) ...[
+                                if (i > 0)
+                                  Divider(
+                                    height: 1,
+                                    thickness: 1,
+                                    indent: 72,
+                                    endIndent: 0,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant
+                                        .withValues(alpha: 0.4),
+                                  ),
+                                _TransactionTile(
+                                  transaction: day.transactions[i],
+                                  accent: _accent(context),
+                                  onTap: () => _openForm(
+                                    context,
+                                    ref,
+                                    existing: day.transactions[i],
+                                  ),
+                                  onDelete: () => _delete(
+                                    context,
+                                    ref,
+                                    day.transactions[i],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                       if (page.hasMore)
                         Padding(
                           padding: const EdgeInsets.only(top: 12),
@@ -607,6 +640,73 @@ class _LoadOlderButton extends StatelessWidget {
               )
             : const Icon(Icons.history),
         label: Text(isLoading ? 'Loading…' : 'Load older transactions'),
+      ),
+    );
+  }
+}
+
+/// One day's worth of transactions.
+class _TransactionDay {
+  _TransactionDay({required this.date, required this.transactions});
+
+  final DateTime date;
+  final List<Transaction> transactions;
+
+  /// What the day cost (or earned), so each group carries its own subtotal.
+  Money get total =>
+      transactions.map((t) => t.amount).reduce((sum, amount) => sum + amount);
+}
+
+/// Date heading above each day's card, with that day's subtotal on the right.
+class _DayHeader extends StatelessWidget {
+  const _DayHeader({
+    required this.date,
+    required this.total,
+    required this.accent,
+  });
+
+  final DateTime date;
+  final Money total;
+  final Color accent;
+
+  /// "Today" and "Yesterday" are how people actually refer to recent days;
+  /// anything older gets a real date.
+  String get _label {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final difference = today.difference(date).inDays;
+    if (difference == 0) return 'Today';
+    if (difference == 1) return 'Yesterday';
+    if (difference < 7 && difference > 0) return DateFormat.EEEE().format(date);
+    if (date.year == today.year) return DateFormat.MMMEd().format(date);
+    return DateFormat.yMMMEd().format(date);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      header: true,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              _label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            Text(
+              total.format(),
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: accent,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
