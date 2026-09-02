@@ -1,0 +1,13 @@
+# Copy this file to android/key.properties and fill in your values, then build
+# a signed release. key.properties is gitignored — never commit it, and back up
+# your keystore safely (losing it means you can't update the app on the Play Store).
+#
+# Generate a keystore (run once, keep the file + passwords safe):
+#   keytool -genkey -v -keystore budgetiq-release.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias budgetiq
+#
+# Then point storeFile at its absolute path below.
+storePassword=your-store-password
+keyPassword=your-key-password
+keyAlias=budgetiq
+storeFile=C:/Users/Admin/keys/budgetiq-release.jks
