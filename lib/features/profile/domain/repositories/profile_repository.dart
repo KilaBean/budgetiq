@@ -8,4 +8,7 @@ abstract interface class ProfileRepository {
 
   /// Updates the user's preferred currency (single-currency MVP).
   Future<Profile> updateCurrency(String currencyCode);
+
+  /// Toggles the larger-text accessibility preference.
+  Future<Profile> updateLargeText(bool largeText);
 }

@@ -1,4 +1,5 @@
-# Brand splash: white bar-chart logo centered on the teal brand color.
+# Brand splash: the white piggy mark centered on the teal brand color,
+# matched by SplashGate so the handoff into Flutter is seamless.
 flutter_native_splash:
   color: "#1FB58F"
   image: assets/branding/splash_logo.png
@@ -8,3 +9,4 @@ flutter_native_splash:
   android_12:
     color: "#1FB58F"
     image: assets/branding/splash_logo.png
+    icon_background_color: "#1FB58F"

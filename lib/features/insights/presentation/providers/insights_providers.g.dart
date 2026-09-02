@@ -50,7 +50,7 @@ final class InsightsProvider
   }
 }
 
-String _$insightsHash() => r'd7fb9c7631aee0d5e67eb1647c341fb6500cd6b7';
+String _$insightsHash() => r'466511a262e142d38d6d8fec01f1c9237f387d5c';
 
 /// The 0–100 financial health score with its factor breakdown.
 

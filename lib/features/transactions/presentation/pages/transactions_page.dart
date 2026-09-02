@@ -20,12 +20,29 @@ import '../../domain/entities/transaction.dart';
 import '../providers/transaction_providers.dart';
 import '../widgets/transaction_form_sheet.dart';
 
-/// Lists and manages transactions for a single [kind]; used by both the Income
-/// and Expense tabs.
-class TransactionsPage extends ConsumerWidget {
-  const TransactionsPage({super.key, required this.kind});
+/// The Activity tab: income and expenses in one place, switched with a
+/// segmented control rather than costing two slots in the navigation bar.
+///
+/// [initialKind] preselects a side, which the legacy `/income` and `/expenses`
+/// routes use so existing links land where the user expects.
+class TransactionsPage extends ConsumerStatefulWidget {
+  const TransactionsPage({super.key, this.initialKind});
 
-  final TransactionKind kind;
+  final TransactionKind? initialKind;
+
+  @override
+  ConsumerState<TransactionsPage> createState() => _TransactionsPageState();
+}
+
+class _TransactionsPageState extends ConsumerState<TransactionsPage> {
+  late TransactionKind kind =
+      widget.initialKind ?? TransactionKind.expense;
+
+  void _setKind(TransactionKind next) {
+    if (next == kind) return;
+    Haptics.selection();
+    setState(() => kind = next);
+  }
 
   Color _accent(BuildContext context) {
     final financial = Theme.of(context).extension<FinancialColors>()!;
@@ -125,7 +142,7 @@ class TransactionsPage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final transactionsAsync = ref.watch(transactionListProvider(kind));
     final filtered = ref.watch(filteredTransactionsProvider(kind));
     final filter = ref.watch(transactionFilterControllerProvider(kind));
@@ -133,7 +150,7 @@ class TransactionsPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(kind.label),
+        title: const Text('Activity'),
         actions: [
           IconButton(
             icon: Icon(
@@ -161,6 +178,26 @@ class TransactionsPage extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: SegmentedButton<TransactionKind>(
+              segments: const [
+                ButtonSegment(
+                  value: TransactionKind.expense,
+                  icon: Icon(Icons.trending_down, size: 18),
+                  label: Text('Expenses'),
+                ),
+                ButtonSegment(
+                  value: TransactionKind.income,
+                  icon: Icon(Icons.trending_up, size: 18),
+                  label: Text('Income'),
+                ),
+              ],
+              selected: {kind},
+              onSelectionChanged: (selection) => _setKind(selection.first),
+              showSelectedIcon: false,
+            ),
+          ),
           _MonthSummaryHeader(
             label: filter.isActive
                 ? 'Filtered ${kind.label.toLowerCase()}'

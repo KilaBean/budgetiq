@@ -31,7 +31,19 @@ class CurrentProfile extends _$CurrentProfile {
     ref.invalidateSelf();
     await future;
   }
+
+  Future<void> setLargeText(bool value) async {
+    await ref.read(profileRepositoryProvider).updateLargeText(value);
+    ref.invalidateSelf();
+    await future;
+  }
 }
+
+/// Whether the user asked for larger text. Applied app-wide as a minimum text
+/// scale in [BudgetIqApp]; the OS setting still wins when it is larger.
+@Riverpod(keepAlive: true)
+bool largeTextEnabled(Ref ref) =>
+    ref.watch(currentProfileProvider).value?.largeText ?? false;
 
 /// The active currency code for money entry/formatting. Defaults to USD until
 /// the profile resolves, so forms always have a sensible value.

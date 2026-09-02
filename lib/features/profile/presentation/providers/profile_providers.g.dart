@@ -84,7 +84,7 @@ final class CurrentProfileProvider
   CurrentProfile create() => CurrentProfile();
 }
 
-String _$currentProfileHash() => r'6b44e1ad586ab2b02fc5d7bd402e9188a69374a5';
+String _$currentProfileHash() => r'74fde693f1f5874ce2385ba25fa84b16c993b006';
 
 /// The current user's profile.
 
@@ -105,6 +105,55 @@ abstract class _$CurrentProfile extends $AsyncNotifier<Profile> {
     return element.handleCreate(ref, build);
   }
 }
+
+/// Whether the user asked for larger text. Applied app-wide as a minimum text
+/// scale in [BudgetIqApp]; the OS setting still wins when it is larger.
+
+@ProviderFor(largeTextEnabled)
+final largeTextEnabledProvider = LargeTextEnabledProvider._();
+
+/// Whether the user asked for larger text. Applied app-wide as a minimum text
+/// scale in [BudgetIqApp]; the OS setting still wins when it is larger.
+
+final class LargeTextEnabledProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// Whether the user asked for larger text. Applied app-wide as a minimum text
+  /// scale in [BudgetIqApp]; the OS setting still wins when it is larger.
+  LargeTextEnabledProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'largeTextEnabledProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$largeTextEnabledHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return largeTextEnabled(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$largeTextEnabledHash() => r'6c10595e87f532041e3b7cc2626adaf683a75d37';
 
 /// The active currency code for money entry/formatting. Defaults to USD until
 /// the profile resolves, so forms always have a sensible value.

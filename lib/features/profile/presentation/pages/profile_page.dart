@@ -104,6 +104,7 @@ class ProfilePage extends ConsumerWidget {
                   ],
                 ),
               ),
+              const _LargeTextTile(),
             ],
           ),
           _SettingsSection(
@@ -275,6 +276,39 @@ class _BiometricTile extends ConsumerWidget {
           await notifier.set(false);
         }
       },
+    );
+  }
+}
+
+/// Larger-text preference, stored on the profile so it follows the user
+/// across devices rather than living only on this one.
+class _LargeTextTile extends ConsumerWidget {
+  const _LargeTextTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(currentProfileProvider);
+    final enabled = profile.value?.largeText ?? false;
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.format_size),
+      title: const Text('Larger text'),
+      subtitle: const Text('Increases text size across the app'),
+      value: enabled,
+      onChanged: profile.isLoading
+          ? null
+          : (value) async {
+              try {
+                await ref
+                    .read(currentProfileProvider.notifier)
+                    .setLargeText(value);
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(SnackBar(content: Text(messageFromError(e))));
+              }
+            },
     );
   }
 }

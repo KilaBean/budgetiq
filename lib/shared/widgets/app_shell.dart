@@ -8,6 +8,10 @@ import '../../features/sync/presentation/widgets/sync_banner.dart';
 ///
 /// Uses [StatefulNavigationShell] so each branch keeps its own navigation
 /// stack and state across tab switches.
+///
+/// Income and expenses share a single **Activity** tab (the kind is a
+/// segmented control inside the page) rather than taking a slot each, which
+/// leaves room for Insights instead of burying it behind the dashboard.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
 
@@ -20,14 +24,9 @@ class AppShell extends StatelessWidget {
       label: 'Home',
     ),
     NavigationDestination(
-      icon: Icon(Icons.trending_up_outlined),
-      selectedIcon: Icon(Icons.trending_up),
-      label: 'Income',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.trending_down_outlined),
-      selectedIcon: Icon(Icons.trending_down),
-      label: 'Expenses',
+      icon: Icon(Icons.swap_vert_outlined),
+      selectedIcon: Icon(Icons.swap_vert),
+      label: 'Activity',
     ),
     NavigationDestination(
       icon: Icon(Icons.account_balance_wallet_outlined),
@@ -38,6 +37,11 @@ class AppShell extends StatelessWidget {
       icon: Icon(Icons.flag_outlined),
       selectedIcon: Icon(Icons.flag),
       label: 'Goals',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.lightbulb_outline),
+      selectedIcon: Icon(Icons.lightbulb),
+      label: 'Insights',
     ),
   ];
 

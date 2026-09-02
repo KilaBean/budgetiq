@@ -1,13 +1,26 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/haptics.dart';
 import '../../domain/services/dashboard_summary.dart';
 
 /// Donut chart of expense spend by category, with a legend.
-class CategoryBreakdownChart extends StatelessWidget {
+///
+/// Touching a slice lifts it and names it in the middle of the ring, so the
+/// chart answers "what is that sliver?" without a legend hunt.
+class CategoryBreakdownChart extends StatefulWidget {
   const CategoryBreakdownChart({super.key, required this.categories});
 
   final List<CategorySpend> categories;
+
+  @override
+  State<CategoryBreakdownChart> createState() => _CategoryBreakdownChartState();
+}
+
+class _CategoryBreakdownChartState extends State<CategoryBreakdownChart> {
+  int? _touchedIndex;
+
+  List<CategorySpend> get categories => widget.categories;
 
   /// Palette generated from the theme so colors stay consistent and readable.
   List<Color> _palette(BuildContext context) {
@@ -36,6 +49,18 @@ class CategoryBreakdownChart extends StatelessWidget {
       )
       .join('. ');
 
+  /// Highlights the slice under the finger, with a tick of haptic feedback on
+  /// each change so the chart feels physical rather than decorative.
+  void _onTouch(FlTouchEvent event, PieTouchResponse? response) {
+    final section = response?.touchedSection;
+    final index = event.isInterestedForInteractions && section != null
+        ? section.touchedSectionIndex
+        : null;
+    if (index == _touchedIndex) return;
+    if (index != null) Haptics.selection();
+    setState(() => _touchedIndex = index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = _palette(context);
@@ -48,28 +73,38 @@ class CategoryBreakdownChart extends StatelessWidget {
         Semantics(
           label: 'Spending by category. ${_spokenBreakdown()}',
           image: true,
+          hint: 'Touch a slice to see its category and amount',
           excludeSemantics: true,
           child: SizedBox(
             height: 160,
             width: 160,
-            child: PieChart(
-              PieChartData(
-                centerSpaceRadius: 44,
-                sectionsSpace: 2,
-                sections: [
-                  for (var i = 0; i < categories.length; i++)
-                    PieChartSectionData(
-                      value: categories[i].amount.major,
-                      color: palette[i % palette.length],
-                      title: '${(categories[i].fraction * 100).round()}%',
-                      radius: 28,
-                      titleStyle: theme.textTheme.labelSmall?.copyWith(
-                        color: _labelColor(palette[i % palette.length]),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                ],
-              ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(
+                  PieChartData(
+                    centerSpaceRadius: 44,
+                    sectionsSpace: 2,
+                    pieTouchData: PieTouchData(touchCallback: _onTouch),
+                    sections: [
+                      for (var i = 0; i < categories.length; i++)
+                        PieChartSectionData(
+                          value: categories[i].amount.major,
+                          color: palette[i % palette.length],
+                          title: '${(categories[i].fraction * 100).round()}%',
+                          // The touched slice lifts out of the ring.
+                          radius: _touchedIndex == i ? 34 : 28,
+                          titleStyle: theme.textTheme.labelSmall?.copyWith(
+                            color: _labelColor(palette[i % palette.length]),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (_touchedIndex != null && _touchedIndex! < categories.length)
+                  _CenterCallout(spend: categories[_touchedIndex!]),
+              ],
             ),
           ),
         ),
@@ -125,6 +160,43 @@ class CategoryBreakdownChart extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Names the slice being touched, in the hole of the donut.
+class _CenterCallout extends StatelessWidget {
+  const _CenterCallout({required this.spend});
+
+  final CategorySpend spend;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: 78,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            spend.categoryName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            spend.amount.formatCompact(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

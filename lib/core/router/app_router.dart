@@ -10,6 +10,7 @@ import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/budgets/presentation/pages/budgets_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/goals/presentation/pages/goals_page.dart';
+import '../../features/insights/presentation/pages/insights_page.dart';
 import '../../features/onboarding/presentation/pages/onboarding_page.dart';
 import '../../features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
@@ -101,18 +102,20 @@ GoRouter goRouter(Ref ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: AppRoutes.transactions,
+                builder: (_, _) => const TransactionsPage(),
+              ),
+              // Legacy per-kind paths open the same tab on the right side.
+              GoRoute(
                 path: AppRoutes.income,
                 builder: (_, _) =>
-                    const TransactionsPage(kind: TransactionKind.income),
+                    const TransactionsPage(initialKind: TransactionKind.income),
               ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
               GoRoute(
                 path: AppRoutes.expenses,
-                builder: (_, _) =>
-                    const TransactionsPage(kind: TransactionKind.expense),
+                builder: (_, _) => const TransactionsPage(
+                  initialKind: TransactionKind.expense,
+                ),
               ),
             ],
           ),
@@ -129,6 +132,14 @@ GoRouter goRouter(Ref ref) {
               GoRoute(
                 path: AppRoutes.goals,
                 builder: (_, _) => const GoalsPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.insights,
+                builder: (_, _) => const InsightsPage(),
               ),
             ],
           ),

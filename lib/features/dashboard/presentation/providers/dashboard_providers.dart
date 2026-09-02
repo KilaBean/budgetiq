@@ -1,11 +1,13 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../shared/domain/month.dart';
 import '../../../transactions/domain/entities/transaction.dart';
 import '../../../transactions/presentation/providers/transaction_providers.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../../../shared/domain/transaction_kind.dart';
+import '../../../budgets/presentation/providers/budget_providers.dart';
 import '../../domain/services/dashboard_summary.dart';
+import '../../domain/services/safe_to_spend.dart';
+import 'selected_month_provider.dart';
 import '../../domain/services/monthly_trend.dart';
 
 part 'dashboard_providers.g.dart';
@@ -29,12 +31,12 @@ Future<DashboardSources> dashboardSources(Ref ref) async {
   return (income: income.items, expense: expense.items);
 }
 
-/// Current-month dashboard headline summary.
+/// Headline summary for the selected month.
 @riverpod
 Future<DashboardSummary> dashboardSummary(Ref ref) async {
   final sources = await ref.watch(dashboardSourcesProvider.future);
   return buildDashboardSummary(
-    month: Month.current(),
+    month: ref.watch(selectedMonthProvider),
     income: sources.income,
     expense: sources.expense,
     currencyCode: ref.watch(currencyCodeProvider),
@@ -49,5 +51,17 @@ Future<List<MonthlyTotals>> dashboardTrend(Ref ref) async {
     income: sources.income,
     expense: sources.expense,
     currencyCode: ref.watch(currencyCodeProvider),
+  );
+}
+
+/// The headline "what can I still spend" figure for the selected month.
+@riverpod
+Future<SafeToSpend> safeToSpend(Ref ref) async {
+  final summary = await ref.watch(dashboardSummaryProvider.future);
+  return computeSafeToSpend(
+    month: ref.watch(selectedMonthProvider),
+    income: summary.income,
+    expense: summary.expense,
+    budget: ref.watch(currentBudgetSummaryProvider),
   );
 }

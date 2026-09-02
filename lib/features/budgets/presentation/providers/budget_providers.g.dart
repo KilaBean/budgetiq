@@ -105,20 +105,20 @@ abstract class _$CurrentBudget extends $AsyncNotifier<Budget?> {
   }
 }
 
-/// Spent-vs-allocated summary for the current month, combining the budget with
-/// this month's expense transactions. `null` while either source is loading.
+/// Spent-vs-allocated summary for the dashboard's selected month, combining the
+/// budget with that month's expenses. `null` while either source is loading.
 
 @ProviderFor(currentBudgetSummary)
 final currentBudgetSummaryProvider = CurrentBudgetSummaryProvider._();
 
-/// Spent-vs-allocated summary for the current month, combining the budget with
-/// this month's expense transactions. `null` while either source is loading.
+/// Spent-vs-allocated summary for the dashboard's selected month, combining the
+/// budget with that month's expenses. `null` while either source is loading.
 
 final class CurrentBudgetSummaryProvider
     extends $FunctionalProvider<BudgetSummary?, BudgetSummary?, BudgetSummary?>
     with $Provider<BudgetSummary?> {
-  /// Spent-vs-allocated summary for the current month, combining the budget with
-  /// this month's expense transactions. `null` while either source is loading.
+  /// Spent-vs-allocated summary for the dashboard's selected month, combining the
+  /// budget with that month's expenses. `null` while either source is loading.
   CurrentBudgetSummaryProvider._()
     : super(
         from: null,
@@ -153,4 +153,4 @@ final class CurrentBudgetSummaryProvider
 }
 
 String _$currentBudgetSummaryHash() =>
-    r'67f5dfbdbbc473fde80a0e5bd7967455522d0fe6';
+    r'32c9e91907ec6f838da74a1d51ff4430fada5d91';

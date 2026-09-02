@@ -1,8 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../shared/domain/month.dart';
 import '../../../budgets/presentation/providers/budget_providers.dart';
 import '../../../dashboard/presentation/providers/dashboard_providers.dart';
+import '../../../dashboard/presentation/providers/selected_month_provider.dart';
 import '../../../goals/presentation/providers/goal_providers.dart';
 import '../../domain/entities/health_score.dart';
 import '../../domain/entities/insight.dart';
@@ -19,7 +19,7 @@ Future<List<Insight>> insights(Ref ref) async {
   final budgetSummary = ref.watch(currentBudgetSummaryProvider);
 
   return generateInsights(
-    month: Month.current(),
+    month: ref.watch(selectedMonthProvider),
     income: sources.income,
     expense: sources.expense,
     budgetSummary: budgetSummary,

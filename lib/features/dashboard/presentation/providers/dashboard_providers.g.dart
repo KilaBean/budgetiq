@@ -55,12 +55,12 @@ final class DashboardSourcesProvider
 
 String _$dashboardSourcesHash() => r'48bbb88bd235cad62d3ad9934aeac997d3c0061f';
 
-/// Current-month dashboard headline summary.
+/// Headline summary for the selected month.
 
 @ProviderFor(dashboardSummary)
 final dashboardSummaryProvider = DashboardSummaryProvider._();
 
-/// Current-month dashboard headline summary.
+/// Headline summary for the selected month.
 
 final class DashboardSummaryProvider
     extends
@@ -70,7 +70,7 @@ final class DashboardSummaryProvider
           FutureOr<DashboardSummary>
         >
     with $FutureModifier<DashboardSummary>, $FutureProvider<DashboardSummary> {
-  /// Current-month dashboard headline summary.
+  /// Headline summary for the selected month.
   DashboardSummaryProvider._()
     : super(
         from: null,
@@ -97,7 +97,7 @@ final class DashboardSummaryProvider
   }
 }
 
-String _$dashboardSummaryHash() => r'8ec57eda4c090fb735ec013aab0dd9de09d6b281';
+String _$dashboardSummaryHash() => r'f40dcf272a0b7c9e2aecb7181088035821e5a03b';
 
 /// Last-6-months income vs expense trend.
 
@@ -144,3 +144,47 @@ final class DashboardTrendProvider
 }
 
 String _$dashboardTrendHash() => r'ec4302ed35058b7f0474e2b2c959b7d611226781';
+
+/// The headline "what can I still spend" figure for the selected month.
+
+@ProviderFor(safeToSpend)
+final safeToSpendProvider = SafeToSpendProvider._();
+
+/// The headline "what can I still spend" figure for the selected month.
+
+final class SafeToSpendProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<SafeToSpend>,
+          SafeToSpend,
+          FutureOr<SafeToSpend>
+        >
+    with $FutureModifier<SafeToSpend>, $FutureProvider<SafeToSpend> {
+  /// The headline "what can I still spend" figure for the selected month.
+  SafeToSpendProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'safeToSpendProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$safeToSpendHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<SafeToSpend> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<SafeToSpend> create(Ref ref) {
+    return safeToSpend(ref);
+  }
+}
+
+String _$safeToSpendHash() => r'9613574331d36b96b6b0b19942d71d3cae4e685f';

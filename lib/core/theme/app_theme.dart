@@ -1,3 +1,4 @@
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -27,7 +28,10 @@ class AppTheme {
       brightness: brightness,
     );
 
+    final isDark = brightness == Brightness.dark;
+
     return base.copyWith(
+      textTheme: _textTheme(base.textTheme),
       scaffoldBackgroundColor: colorScheme.surface,
       extensions: [financial],
       // Smooth, modern page transitions across platforms.
@@ -48,7 +52,11 @@ class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         clipBehavior: Clip.antiAlias,
-        color: colorScheme.surfaceContainerLow,
+        // Dark surfaces sit close together, so cards need a higher tier than
+        // in light or they visually merge into the scaffold.
+        color: isDark
+            ? colorScheme.surfaceContainerHigh
+            : colorScheme.surfaceContainerLow,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -82,6 +90,42 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+    );
+  }
+
+  /// Inter throughout, with **tabular figures** everywhere.
+  ///
+  /// Proportional digits make money jump around: columns of amounts fail to
+  /// line up, and a counting [AnimatedAmount] visibly reflows on every frame.
+  /// Fixed-width digits are the norm in finance UIs for exactly that reason.
+  ///
+  /// Display and headline sizes also get slightly tighter tracking, which Inter
+  /// needs at large optical sizes.
+  static TextTheme _textTheme(TextTheme base) {
+    TextStyle? body(TextStyle? style) => style?.copyWith(
+      fontFamily: 'Inter',
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
+    TextStyle? tight(TextStyle? style) =>
+        body(style)?.copyWith(letterSpacing: -0.5);
+
+    return TextTheme(
+      displayLarge: tight(base.displayLarge),
+      displayMedium: tight(base.displayMedium),
+      displaySmall: tight(base.displaySmall),
+      headlineLarge: tight(base.headlineLarge),
+      headlineMedium: tight(base.headlineMedium),
+      headlineSmall: tight(base.headlineSmall),
+      titleLarge: body(base.titleLarge),
+      titleMedium: body(base.titleMedium),
+      titleSmall: body(base.titleSmall),
+      bodyLarge: body(base.bodyLarge),
+      bodyMedium: body(base.bodyMedium),
+      bodySmall: body(base.bodySmall),
+      labelLarge: body(base.labelLarge),
+      labelMedium: body(base.labelMedium),
+      labelSmall: body(base.labelSmall),
     );
   }
 }

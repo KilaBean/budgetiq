@@ -25,7 +25,9 @@ import '../../../transactions/presentation/providers/transaction_providers.dart'
 import '../../../transactions/presentation/widgets/transaction_form_sheet.dart';
 import '../../domain/services/dashboard_summary.dart';
 import '../../domain/services/monthly_trend.dart';
+import '../../../../shared/widgets/staggered_entrance.dart';
 import '../providers/dashboard_providers.dart';
+import '../providers/selected_month_provider.dart';
 import '../widgets/category_breakdown_chart.dart';
 import '../widgets/income_expense_trend_chart.dart';
 
@@ -75,75 +77,221 @@ class DashboardPage extends ConsumerWidget {
     final summaryAsync = ref.watch(dashboardSummaryProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Profile',
-            onPressed: () => context.push(AppRoutes.profile),
-          ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'fab_dashboard',
         onPressed: () => _quickAdd(context, ref),
         child: const Icon(Icons.add),
       ),
-      body: summaryAsync.when(
-        loading: () => const _DashboardSkeleton(),
-        error: (e, _) => ErrorView(
-          error: e,
-          onRetry: () => ref.invalidate(dashboardSourcesProvider),
-        ),
-        data: (summary) => RefreshIndicator(
-          onRefresh: () async => ref.invalidate(dashboardSourcesProvider),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            children: [
-              _Greeting(email: email, month: summary.month),
-              const SizedBox(height: 16),
-              _NetCard(summary: summary),
-              const SizedBox(height: 12),
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: RefreshIndicator(
+        onRefresh: () async => ref.invalidate(dashboardSourcesProvider),
+        child: CustomScrollView(
+          slivers: [
+            // The greeting doubles as the collapsing title, so the header
+            // earns its space instead of repeating the tab name.
+            SliverAppBar.large(
+              title: _Greeting(email: email),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.person_outline),
+                  tooltip: 'Profile',
+                  onPressed: () => context.push(AppRoutes.profile),
+                ),
+              ],
+            ),
+            const SliverToBoxAdapter(child: _MonthSwitcher()),
+            summaryAsync.when(
+              loading: () =>
+                  const SliverToBoxAdapter(child: _DashboardSkeleton()),
+              error: (e, _) => SliverToBoxAdapter(
+                child: ErrorView(
+                  error: e,
+                  onRetry: () => ref.invalidate(dashboardSourcesProvider),
+                ),
+              ),
+              data: (summary) => SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                sliver: SliverList.list(
                   children: [
-                    Expanded(
-                      child: _StatCard(
-                        label: 'Income',
-                        amount: summary.income,
-                        deltaPct: summary.incomeDeltaPct,
-                        higherIsGood: true,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatCard(
-                        label: 'Expenses',
-                        amount: summary.expense,
-                        deltaPct: summary.expenseDeltaPct,
-                        higherIsGood: false,
-                      ),
-                    ),
+                    for (final (index, section) in _sections(summary).indexed)
+                      StaggeredEntrance(index: index, child: section),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              _SectionCard(title: 'Last 6 months', child: _TrendSection()),
-              const SizedBox(height: 16),
-              _SectionCard(
-                title: 'Spending by category',
-                child: summary.topExpenseCategories.isEmpty
-                    ? const _MiniEmpty(text: 'No expenses this month yet.')
-                    : CategoryBreakdownChart(
-                        categories: summary.topExpenseCategories,
-                      ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The dashboard cards, in reading order: what can I spend, what happened,
+  /// where it went, how am I doing.
+  List<Widget> _sections(DashboardSummary summary) => [
+    const _SafeToSpendCard(),
+    const SizedBox(height: 12),
+    _NetCard(summary: summary),
+    const SizedBox(height: 12),
+    IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _StatCard(
+              label: 'Income',
+              amount: summary.income,
+              deltaPct: summary.incomeDeltaPct,
+              higherIsGood: true,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _StatCard(
+              label: 'Expenses',
+              amount: summary.expense,
+              deltaPct: summary.expenseDeltaPct,
+              higherIsGood: false,
+            ),
+          ),
+        ],
+      ),
+    ),
+    const SizedBox(height: 20),
+    _SectionCard(title: 'Last 6 months', child: _TrendSection()),
+    const SizedBox(height: 16),
+    _SectionCard(
+      title: 'Spending by category',
+      child: summary.topExpenseCategories.isEmpty
+          ? const _MiniEmpty(text: 'No expenses this month yet.')
+          : CategoryBreakdownChart(categories: summary.topExpenseCategories),
+    ),
+    const SizedBox(height: 16),
+    _BudgetSnapshot(),
+    const SizedBox(height: 16),
+    _InsightsSnapshot(),
+  ];
+}
+
+/// Steps the whole dashboard through months.
+class _MonthSwitcher extends ConsumerWidget {
+  const _MonthSwitcher();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final month = ref.watch(selectedMonthProvider);
+    final notifier = ref.read(selectedMonthProvider.notifier);
+    final atCurrent = month == Month.current();
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            tooltip: 'Previous month',
+            onPressed: () {
+              Haptics.selection();
+              notifier.previous();
+            },
+          ),
+          // Fixed width so swapping the label does not shift the arrows.
+          SizedBox(
+            width: 168,
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                transitionBuilder: (child, animation) =>
+                    FadeTransition(opacity: animation, child: child),
+                child: Text(
+                  month.label,
+                  key: ValueKey(month),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
-              _BudgetSnapshot(),
-              const SizedBox(height: 16),
-              _InsightsSnapshot(),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            tooltip: 'Next month',
+            // There is no future data to show.
+            onPressed: atCurrent
+                ? null
+                : () {
+                    Haptics.selection();
+                    notifier.next();
+                  },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The headline card: what is left to spend, and what that is per day.
+class _SafeToSpendCard extends ConsumerWidget {
+  const _SafeToSpendCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final financial = theme.extension<FinancialColors>()!;
+    final safe = ref.watch(safeToSpendProvider).value;
+    if (safe == null) return const SizedBox.shrink();
+
+    final overspent = safe.isOverspent;
+    final amountColor = overspent ? financial.expense : financial.income;
+    final basis = safe.fromBudget ? 'your budget' : 'what you earned';
+
+    return Semantics(
+      container: true,
+      label: overspent
+          ? 'Over budget this month'
+          : 'Safe to spend ${safe.remaining.format()}, '
+                '${safe.perDay.format()} per day for ${safe.daysLeft} days',
+      excludeSemantics: true,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    overspent ? 'Over budget' : 'Safe to spend',
+                    style: theme.textTheme.labelLarge,
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    safe.fromBudget
+                        ? Icons.account_balance_wallet_outlined
+                        : Icons.savings_outlined,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              AnimatedAmount(
+                amount: safe.remaining,
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: amountColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                overspent
+                    ? 'You have spent more than $basis this month.'
+                    : '${safe.perDay.format()} a day for the next '
+                          '${safe.daysLeft} ${safe.daysLeft == 1 ? "day" : "days"}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ),
@@ -207,45 +355,43 @@ class _InsightsSnapshot extends ConsumerWidget {
 }
 
 class _Greeting extends StatelessWidget {
-  const _Greeting({required this.email, required this.month});
+  const _Greeting({required this.email});
 
   final String? email;
-  final Month month;
 
   @override
   Widget build(BuildContext context) {
     final name = email?.split('@').first;
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          name == null ? 'Welcome back' : 'Hi, $name',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Text(
-          month.label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
+    // The app bar shrinks its title as the header collapses, so this is one
+    // line rather than a stack; the month lives in the switcher below.
+    return Semantics(
+      header: true,
+      child: Text(name == null ? 'Welcome back' : 'Hi, $name'),
     );
   }
 }
 
-class _NetCard extends ConsumerWidget {
+class _NetCard extends ConsumerStatefulWidget {
   const _NetCard({required this.summary});
 
   final DashboardSummary summary;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_NetCard> createState() => _NetCardState();
+}
+
+class _NetCardState extends ConsumerState<_NetCard> {
+  /// The month being scrubbed on the sparkline, if any.
+  MonthlyTotals? _scrubbed;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = widget.summary;
     final theme = Theme.of(context);
     final financial = theme.extension<FinancialColors>()!;
-    final positive = summary.net.minorUnits >= 0;
+    final scrubbed = _scrubbed;
+    final net = scrubbed?.net ?? summary.net;
+    final positive = net.minorUnits >= 0;
     final trend = ref.watch(dashboardTrendProvider).value;
     return Card(
       color: theme.colorScheme.primaryContainer,
@@ -261,14 +407,16 @@ class _NetCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Net this month',
+                        scrubbed == null
+                            ? 'Net this month'
+                            : 'Net in ${scrubbed.month.label}',
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: theme.colorScheme.onPrimaryContainer,
                         ),
                       ),
                       const SizedBox(height: 6),
                       AnimatedAmount(
-                        amount: summary.net,
+                        amount: net,
                         style: theme.textTheme.displaySmall?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: positive
@@ -289,7 +437,10 @@ class _NetCard extends ConsumerWidget {
                     child: SizedBox(
                       width: 104,
                       height: 48,
-                      child: _NetSparkline(series: trend),
+                      child: _NetSparkline(
+                        series: trend,
+                        onScrub: (month) => setState(() => _scrubbed = month),
+                      ),
                     ),
                   ),
               ],
@@ -313,10 +464,35 @@ class _NetCard extends ConsumerWidget {
 /// Renders a curved line with a gradient area fill, a dashed zero baseline,
 /// sign-colored fills (income green above zero, expense red below), and a dot
 /// marking the latest month — coloured by whether that month was net positive.
-class _NetSparkline extends StatelessWidget {
-  const _NetSparkline({required this.series});
+class _NetSparkline extends StatefulWidget {
+  const _NetSparkline({required this.series, this.onScrub});
 
   final List<MonthlyTotals> series;
+
+  /// Reports the month under the finger, or null when the touch ends.
+  final ValueChanged<MonthlyTotals?>? onScrub;
+
+  @override
+  State<_NetSparkline> createState() => _NetSparklineState();
+}
+
+class _NetSparklineState extends State<_NetSparkline> {
+  int? _scrubbed;
+
+  List<MonthlyTotals> get series => widget.series;
+
+  void _onTouch(FlTouchEvent event, LineTouchResponse? response) {
+    final spot = response?.lineBarSpots?.firstOrNull;
+    final index = event.isInterestedForInteractions && spot != null
+        ? spot.spotIndex
+        : null;
+    if (index == _scrubbed) return;
+    if (index != null) Haptics.selection();
+    setState(() => _scrubbed = index);
+    widget.onScrub?.call(
+      index == null || index >= series.length ? null : series[index],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -335,7 +511,12 @@ class _NetSparkline extends StatelessWidget {
       LineChartData(
         minY: math.min(0, minV) * 1.15,
         maxY: math.max(0, maxV) * 1.15,
-        lineTouchData: const LineTouchData(enabled: false),
+        // Scrubbing reads out the month under the finger in the card above.
+        lineTouchData: LineTouchData(
+          touchCallback: _onTouch,
+          handleBuiltInTouches: false,
+          touchSpotThreshold: 24,
+        ),
         gridData: const FlGridData(show: false),
         titlesData: const FlTitlesData(show: false),
         borderData: FlBorderData(show: false),

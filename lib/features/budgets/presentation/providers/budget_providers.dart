@@ -9,6 +9,7 @@ import '../../../../shared/domain/month.dart';
 import '../../../../shared/domain/transaction_kind.dart';
 import '../../../categories/data/datasources/category_local_data_source.dart';
 import '../../../sync/presentation/providers/sync_providers.dart';
+import '../../../dashboard/presentation/providers/selected_month_provider.dart';
 import '../../../transactions/presentation/providers/transaction_providers.dart';
 import '../../data/datasources/budget_local_data_source.dart';
 import '../../data/datasources/budget_remote_data_source.dart';
@@ -72,15 +73,15 @@ class CurrentBudget extends _$CurrentBudget {
   }
 }
 
-/// Spent-vs-allocated summary for the current month, combining the budget with
-/// this month's expense transactions. `null` while either source is loading.
+/// Spent-vs-allocated summary for the dashboard's selected month, combining the
+/// budget with that month's expenses. `null` while either source is loading.
 @riverpod
 BudgetSummary? currentBudgetSummary(Ref ref) {
   final budget = ref.watch(currentBudgetProvider).value;
   final expenses = ref.watch(transactionItemsProvider(TransactionKind.expense));
   if (budget == null || expenses == null) return null;
 
-  final month = Month.current();
+  final month = ref.watch(selectedMonthProvider);
   final monthExpenses = expenses
       .where((t) => month.contains(t.occurredOn))
       .toList();

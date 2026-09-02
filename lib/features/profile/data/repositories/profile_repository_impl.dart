@@ -47,12 +47,24 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
-  Future<Profile> updateCurrency(String currencyCode) async {
+  Future<Profile> updateCurrency(String currencyCode) => _update({
+    'currency_code': currencyCode,
+  }, offlineMessage: 'Connect to change your currency.');
+
+  @override
+  Future<Profile> updateLargeText(bool largeText) => _update({
+    'large_text': largeText,
+  }, offlineMessage: 'Connect to change text size.');
+
+  Future<Profile> _update(
+    Map<String, dynamic> values, {
+    required String offlineMessage,
+  }) async {
     if (!_isOnline()) {
-      throw const NetworkFailure('Connect to change your currency.');
+      throw NetworkFailure(offlineMessage);
     }
     try {
-      final row = await _remote.update({'currency_code': currencyCode});
+      final row = await _remote.update(values);
       await _local.write(row);
       return ProfileModel.fromJson(row);
     } on AuthException catch (e) {
