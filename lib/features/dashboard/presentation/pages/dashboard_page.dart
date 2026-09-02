@@ -307,24 +307,35 @@ class _HeadlineCardState extends ConsumerState<_HeadlineCard> {
                         crossAxisAlignment: CrossAxisAlignment.baseline,
                         textBaseline: TextBaseline.alphabetic,
                         children: [
-                          AnimatedAmount(
-                            amount: net,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: net.minorUnits >= 0
-                                  ? financial.income
-                                  : financial.expense,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (scrubbed == null && !summary.income.isZero)
-                            Text(
-                              '${(summary.savingsRate * 100).round()}% saved',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onPrimaryContainer
-                                    .withValues(alpha: 0.8),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: AnimatedAmount(
+                                amount: net,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: net.minorUnits >= 0
+                                      ? financial.income
+                                      : financial.expense,
+                                ),
                               ),
                             ),
+                          ),
+                          if (scrubbed == null && !summary.income.isZero) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                '${(summary.savingsRate * 100).round()}% saved',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onPrimaryContainer
+                                      .withValues(alpha: 0.8),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
@@ -903,25 +914,31 @@ class _DashboardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      children: const [
-        SkeletonBox(width: 160, height: 22),
-        SizedBox(height: 20),
-        SkeletonBox(height: 110, radius: 16),
-        SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: SkeletonBox(height: 90, radius: 16)),
-            SizedBox(width: 12),
-            Expanded(child: SkeletonBox(height: 90, radius: 16)),
-          ],
-        ),
-        SizedBox(height: 20),
-        SkeletonBox(height: 240, radius: 16),
-        SizedBox(height: 16),
-        SkeletonBox(height: 180, radius: 16),
-      ],
+    // A Column, not a ListView: this sits inside the dashboard's
+    // CustomScrollView, which supplies the scrolling and would give a nested
+    // vertical viewport unbounded height.
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SkeletonBox(width: 160, height: 22),
+          SizedBox(height: 20),
+          SkeletonBox(height: 110, radius: 16),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: SkeletonBox(height: 90, radius: 16)),
+              SizedBox(width: 12),
+              Expanded(child: SkeletonBox(height: 90, radius: 16)),
+            ],
+          ),
+          SizedBox(height: 20),
+          SkeletonBox(height: 240, radius: 16),
+          SizedBox(height: 16),
+          SkeletonBox(height: 180, radius: 16),
+        ],
+      ),
     );
   }
 }
