@@ -35,11 +35,6 @@ class _CategoryBreakdownChartState extends State<CategoryBreakdownChart> {
     ];
   }
 
-  /// Black or white text, whichever contrasts with [background] — keeps the
-  /// on-slice percentage labels legible across the whole palette.
-  Color _labelColor(Color background) =>
-      background.computeLuminance() > 0.5 ? Colors.black87 : Colors.white;
-
   /// Reads the slices out as text, e.g. "Food and Dining, 45 percent, $320.00".
   String _spokenBreakdown() => categories
       .map(
@@ -91,13 +86,11 @@ class _CategoryBreakdownChartState extends State<CategoryBreakdownChart> {
                         PieChartSectionData(
                           value: categories[i].amount.major,
                           color: palette[i % palette.length],
-                          title: '${(categories[i].fraction * 100).round()}%',
+                          // The ring shows proportion; the legend beside it
+                          // carries the numbers, where they always have room.
+                          showTitle: false,
                           // The touched slice lifts out of the ring.
                           radius: _touchedIndex == i ? 34 : 28,
-                          titleStyle: theme.textTheme.labelSmall?.copyWith(
-                            color: _labelColor(palette[i % palette.length]),
-                            fontWeight: FontWeight.w700,
-                          ),
                         ),
                     ],
                   ),
@@ -144,7 +137,8 @@ class _CategoryBreakdownChartState extends State<CategoryBreakdownChart> {
                               ),
                             ),
                             Text(
-                              categories[i].amount.format(),
+                              '${categories[i].amount.format()}  ·  '
+                              '${(categories[i].fraction * 100).round()}%',
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
