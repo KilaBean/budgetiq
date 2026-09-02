@@ -131,7 +131,9 @@ class DashboardPage extends ConsumerWidget {
   /// The dashboard cards, in reading order: what can I spend, what happened,
   /// where it went, how am I doing.
   List<Widget> _sections(DashboardSummary summary) => [
-    _HeadlineCard(summary: summary),
+    const _SafeToSpendCard(),
+    const SizedBox(height: 12),
+    _NetCard(summary: summary),
     const SizedBox(height: 12),
     IntrinsicHeight(
       child: Row(
@@ -232,40 +234,18 @@ class _MonthSwitcher extends ConsumerWidget {
   }
 }
 
-/// The one card that answers "how am I doing this month".
-///
-/// Deliberately the only large card on the screen: research on finance
-/// dashboards is consistent that the home screen should carry a single
-/// headline takeaway and push the rest a tap away. It stacks, in order of how
-/// often the question is asked:
-///
-/// 1. what can I still spend (and per day),
-/// 2. how far through that allowance I am,
-/// 3. what actually happened this month (net + savings rate + trend).
-class _HeadlineCard extends ConsumerStatefulWidget {
-  const _HeadlineCard({required this.summary});
-
-  final DashboardSummary summary;
+/// What is still spendable this month — the question the app exists to
+/// answer, so it leads the screen on its own.
+class _SafeToSpendCard extends ConsumerWidget {
+  const _SafeToSpendCard();
 
   @override
-  ConsumerState<_HeadlineCard> createState() => _HeadlineCardState();
-}
-
-class _HeadlineCardState extends ConsumerState<_HeadlineCard> {
-  /// The month being scrubbed on the sparkline, if any.
-  MonthlyTotals? _scrubbed;
-
-  @override
-  Widget build(BuildContext context) {
-    final summary = widget.summary;
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final financial = theme.extension<FinancialColors>()!;
     final safe = ref.watch(safeToSpendProvider).value;
-    final trend = ref.watch(dashboardTrendProvider).value;
+    if (safe == null) return const SizedBox.shrink();
 
-    final scrubbed = _scrubbed;
-    final net = scrubbed?.net ?? summary.net;
-    final overspent = safe?.isOverspent ?? false;
+    final summary = ref.watch(dashboardSummaryProvider).value;
 
     return Card(
       color: theme.colorScheme.primaryContainer,
@@ -274,92 +254,104 @@ class _HeadlineCardState extends ConsumerState<_HeadlineCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (safe != null) ...[
-              _SafeToSpend(safe: safe),
+            _SafeToSpend(safe: safe),
+            if (summary != null) ...[
               const SizedBox(height: 14),
               _SpendProgress(summary: summary, safe: safe),
-              const SizedBox(height: 14),
-              Divider(
-                height: 1,
-                color: theme.colorScheme.onPrimaryContainer.withValues(
-                  alpha: 0.12,
-                ),
-              ),
-              const SizedBox(height: 12),
             ],
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        scrubbed == null
-                            ? 'Net this month'
-                            : 'Net in ${scrubbed.month.label}',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer
-                              .withValues(alpha: 0.8),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Flexible(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: AnimatedAmount(
-                                amount: net,
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: net.minorUnits >= 0
-                                      ? financial.income
-                                      : financial.expense,
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (scrubbed == null && !summary.income.isZero) ...[
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                '${(summary.savingsRate * 100).round()}% saved',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onPrimaryContainer
-                                      .withValues(alpha: 0.8),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// What actually happened this month: net, savings rate, and the trend behind
+/// it. Reports on the month just gone by, where the card above looks forward.
+class _NetCard extends ConsumerStatefulWidget {
+  const _NetCard({required this.summary});
+
+  final DashboardSummary summary;
+
+  @override
+  ConsumerState<_NetCard> createState() => _NetCardState();
+}
+
+class _NetCardState extends ConsumerState<_NetCard> {
+  /// The month being scrubbed on the sparkline, if any.
+  MonthlyTotals? _scrubbed;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = widget.summary;
+    final theme = Theme.of(context);
+    final financial = theme.extension<FinancialColors>()!;
+    final trend = ref.watch(dashboardTrendProvider).value;
+
+    final scrubbed = _scrubbed;
+    final net = scrubbed?.net ?? summary.net;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    scrubbed == null
+                        ? 'Net this month'
+                        : 'Net in ${scrubbed.month.label}',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-                if (trend != null && trend.length > 1)
-                  Semantics(
-                    label:
-                        'Net trend over the last ${trend.length} months, '
-                        'ending at ${trend.last.net.format()}',
-                    image: true,
-                    excludeSemantics: true,
-                    child: SizedBox(
-                      width: 96,
-                      height: 44,
-                      child: _NetSparkline(
-                        series: trend,
-                        onScrub: (month) => setState(() => _scrubbed = month),
+                  const SizedBox(height: 4),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedAmount(
+                      amount: net,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: net.minorUnits >= 0
+                            ? financial.income
+                            : financial.expense,
                       ),
                     ),
                   ),
-              ],
+                  if (scrubbed == null && !summary.income.isZero) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${(summary.savingsRate * 100).round()}% of income saved',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            if (safe == null && overspent) const SizedBox.shrink(),
+            if (trend != null && trend.length > 1)
+              Semantics(
+                label:
+                    'Net trend over the last ${trend.length} months, '
+                    'ending at ${trend.last.net.format()}',
+                image: true,
+                excludeSemantics: true,
+                child: SizedBox(
+                  width: 104,
+                  height: 48,
+                  child: _NetSparkline(
+                    series: trend,
+                    onScrub: (month) => setState(() => _scrubbed = month),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
