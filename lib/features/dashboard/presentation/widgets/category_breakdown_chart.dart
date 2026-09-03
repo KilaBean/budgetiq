@@ -71,14 +71,14 @@ class _CategoryBreakdownChartState extends State<CategoryBreakdownChart> {
           hint: 'Touch a slice to see its category and amount',
           excludeSemantics: true,
           child: SizedBox(
-            height: 160,
-            width: 160,
+            height: 140,
+            width: 140,
             child: Stack(
               alignment: Alignment.center,
               children: [
                 PieChart(
                   PieChartData(
-                    centerSpaceRadius: 44,
+                    centerSpaceRadius: 38,
                     sectionsSpace: 2,
                     pieTouchData: PieTouchData(touchCallback: _onTouch),
                     sections: [
@@ -137,14 +137,22 @@ class _CategoryBreakdownChartState extends State<CategoryBreakdownChart> {
                               ),
                             ),
                             Text(
-                              '${categories[i].amount.format()}  ·  '
-                              '${(categories[i].fraction * 100).round()}%',
+                              categories[i].amount.formatCompact(),
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Short and fixed-width, so it never competes with the
+                      // category name or a long currency string for space.
+                      Text(
+                        '${(categories[i].fraction * 100).round()}%',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
